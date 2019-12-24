@@ -29,12 +29,12 @@ To run the service, create an Amazon S3 bucket in one of the AWS Regions for acc
 
 ## How to run this application
 
-To run this application, clone the [`ej2-amazon-s3-aspcore-file-provider`](https://github.com/ej2-amazon-s3-aspcore-file-provider) repository and then navigate to its appropriate path where it has been located in your system.
+To run this application, clone the [`ej2-amazon-s3-aspcore-file-provider`](https://github.com/SyncfusionExamples/ej2-amazon-s3-aspcore-file-provider) repository and then navigate to its appropriate path where it has been located in your system.
 
 To do so, open the command prompt and run the following commands one after the other.
 
 ```
-git clone https://github.com/ej2-amazon-s3-aspcore-file-provider   
+git clone https://github.com/SyncfusionExamples/ej2-amazon-s3-aspcore-file-provider   
 
 cd ej2-amazon-s3-aspcore-file-provider
 ```
