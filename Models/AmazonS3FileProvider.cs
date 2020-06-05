@@ -548,14 +548,101 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
             {
                 string fileName = Path.GetFileName(uploadFiles[0].FileName);
                 GetBucketList();
-                using (FileStream fsSource = new FileStream(Path.Combine(Path.GetTempPath(), fileName), FileMode.Create))
+                List<string> existFiles = new List<string>();
+                foreach (IFormFile file in uploadFiles)
                 {
-                    uploadFiles[0].CopyTo(fsSource);
-                    fsSource.Close();
+                    string name = file.FileName;
+                    string fullName = Path.Combine(Path.GetTempPath(), name);
+                    if (uploadFiles != null)
+                    {
+                        if (action == "save")
+                        {
+                            if (!System.IO.File.Exists(fullName))
+                            {
+                                using (FileStream fsSource = new FileStream(Path.Combine(Path.GetTempPath(), fileName), FileMode.Create))
+                                {
+                                    uploadFiles[0].CopyTo(fsSource);
+                                    fsSource.Close();
+                                }
+                                using (FileStream fileToUpload = new FileStream(Path.Combine(Path.GetTempPath(), fileName), FileMode.Open, FileAccess.Read))
+                                {
+                                    await fileTransferUtility.UploadAsync(fileToUpload, bucketName, RootName.Replace("/", "") + path + file.FileName);
+                                }
+                            }
+                            else
+                            {
+                                existFiles.Add(name);
+                            }
+
+                        }
+                        else if (action == "replace")
+                        {
+                            if (System.IO.File.Exists(fullName))
+                            {
+                                System.IO.File.Delete(fullName);
+                            }
+                            using (FileStream fsSource = new FileStream(Path.Combine(Path.GetTempPath(), fileName), FileMode.Create))
+                            {
+                                file.CopyTo(fsSource);
+                                fsSource.Close();
+                            }
+                            using (FileStream fileToUpload = new FileStream(Path.Combine(Path.GetTempPath(), fileName), FileMode.Open, FileAccess.Read))
+                            {
+                                await fileTransferUtility.UploadAsync(fileToUpload, bucketName, RootName.Replace("/", "") + path + file.FileName);
+                            }
+
+                        }
+                        else if (action == "keepboth")
+                        {
+                            string newName = fullName;
+                            string newFileName = file.FileName;
+                            int index = fullName.LastIndexOf(".");
+                            int indexValue = newFileName.LastIndexOf(".");
+                            if (index >= 0)
+                            {
+                                newName = fullName.Substring(0, index);
+                                newFileName = newFileName.Substring(0, indexValue);
+                            }
+                            int fileCount = 0;
+                            while (System.IO.File.Exists(newName + (fileCount > 0 ? "(" + fileCount.ToString() + ")" + Path.GetExtension(name) : Path.GetExtension(name))))
+                            {
+                                fileCount++;
+                            }
+                            newName = newFileName + (fileCount > 0 ? "(" + fileCount.ToString() + ")" : "") + Path.GetExtension(name);
+                            GetBucketList();
+                            using (FileStream fsSource = new FileStream(Path.Combine(Path.GetTempPath(), newName), FileMode.Create))
+                            {
+                                file.CopyTo(fsSource);
+                                fsSource.Close();
+                            }
+                            using (FileStream fileToUpload = new FileStream(Path.Combine(Path.GetTempPath(), newName), FileMode.Open, FileAccess.Read))
+                            {
+                                await fileTransferUtility.UploadAsync(fileToUpload, bucketName, RootName.Replace("/", "") + path + newName);
+                            }
+                        }
+                        else if (action == "remove")
+                        {
+                            if (System.IO.File.Exists(fullName))
+                            {
+                                System.IO.File.Delete(fullName);
+                            }
+                            else
+                            {
+                                ErrorDetails er = new ErrorDetails();
+                                er.Code = "404";
+                                er.Message = "File not found.";
+                                uploadResponse.Error = er;
+                            }
+                        }
+                    }
                 }
-                using (FileStream fileToUpload = new FileStream(Path.Combine(Path.GetTempPath(), fileName), FileMode.Open, FileAccess.Read))
+                if (existFiles.Count != 0)
                 {
-                    await fileTransferUtility.UploadAsync(fileToUpload, bucketName, RootName.Replace("/", "") + path + uploadFiles[0].FileName);
+                    ErrorDetails er = new ErrorDetails();
+                    er.FileExists = existFiles;
+                    er.Code = "400";
+                    er.Message = "File Already Exists";
+                    uploadResponse.Error = er;
                 }
             }
             catch (Exception ex) { throw ex; }
