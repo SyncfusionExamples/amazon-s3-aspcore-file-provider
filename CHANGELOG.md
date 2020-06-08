@@ -1,9 +1,17 @@
 # Changelog
 
-## 17.3.0.14 (2019-10-04)
+## [Unreleased]
 
-### Amazon S3 File System Provider
+### Amazon S3 File Provider
 
 #### New Features
 
-- Added file system provider support for Amazon S3(Simple Storage Service) bucket storage service.
+- Support has been provided for upload customization.
+
+## 17.3.0.14 (2019-10-04)
+
+### Amazon S3 File Provider
+
+#### New Features
+
+- Added file provider support for Amazon S3(Simple Storage Service) bucket storage service.
