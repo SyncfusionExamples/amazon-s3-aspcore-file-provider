@@ -65,7 +65,7 @@ namespace EJ2AmazonS3ASPCoreFileProvider.Controllers
                     return this.operation.ToCamelCase(this.operation.Create(args.Path, args.Name, args.Data));
                 case "search":
                     // gets the list of file(s) or folder(s) from a given path based on the searched key string.
-                    return this.operation.ToCamelCase(this.operation.Search(args.Path, args.SearchString, args.ShowHiddenItems, args.CaseSensitive));
+                    return this.operation.ToCamelCase(this.operation.Search(args.Path, args.SearchString, args.ShowHiddenItems, args.CaseSensitive, args.Data));
                 case "rename":
                     // renames a file or folder.
                     return this.operation.ToCamelCase(this.operation.Rename(args.Path, args.Name, args.NewName, false, args.Data));
