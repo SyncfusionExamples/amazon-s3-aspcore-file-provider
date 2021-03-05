@@ -748,6 +748,11 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
                 }
                 await client.DeleteObjectsAsync(deleteObjectsRequest);
                 ListingObjectsAsync("/", RootName.Replace("/", "") + path + names[0], false).Wait();
+                foreach (string name in names)
+                {
+                    string tempfile = Path.Combine(Path.GetTempPath(), name);
+                    if (System.IO.File.Exists(tempfile)) System.IO.File.Delete(tempfile); else if (Directory.Exists(tempfile)) Directory.Delete(tempfile, true);
+                }
             }
             catch (AmazonS3Exception amazonS3Exception) { throw amazonS3Exception; }
         }
