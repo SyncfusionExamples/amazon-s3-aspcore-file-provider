@@ -16,7 +16,7 @@ using System.IO.Compression;
 
 namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
 {
-    public class AmazonS3FileProvider : AmazonS3FileProviderBase
+    public class AmazonS3FileProvider : IAmazonS3FileProviderBase
     {
         protected static string bucketName;
         static IAmazonS3 client;
