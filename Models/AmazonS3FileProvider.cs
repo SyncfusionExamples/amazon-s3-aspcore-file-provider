@@ -64,12 +64,14 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
             catch (Exception ex) { throw ex; }
             try
             {
-                if (response.CommonPrefixes.Count > 0)
-                    files = response.CommonPrefixes.Select((y, i) => CreateDirectoryContentInstance(response.CommonPrefixes[i].Replace(RootName.Replace("/", "") + path, "").Replace("/", ""), false, "Folder", 0, new DateTime(), new DateTime(), this.checkChild(response.CommonPrefixes[i]), y.Substring(0, y.Length - y.Split("/")[y.Split("/").Length - 2].Length - 1).Substring(RootName.Length - 1))).ToList();
+                if (response.CommonPrefixes.Count > 0) {
+                    files = response.CommonPrefixes.Select((y, i) => CreateDirectoryContentInstance(setFilename(response.CommonPrefixes[i], path), false, "Folder", 0, new DateTime(), new DateTime(), this.checkChild(response.CommonPrefixes[i]), setFilterPath(y))).ToList();
+                }
             }
             catch (Exception ex) { throw ex; }
             try
             {
+                if (path == "/") ListingObjectsAsync("/", RootName, false).Wait(); else ListingObjectsAsync("/", this.RootName.Replace("/", "") + path, false).Wait();
                 if (response.S3Objects.Count > 0)
                     filesS3 = response.S3Objects.Where(x => x.Key != RootName.Replace("/", "") + path).Select(y => CreateDirectoryContentInstance(y.Key.ToString().Replace(RootName.Replace("/", "") + path, "").Replace("/", ""), true, Path.GetExtension(y.Key.ToString()), y.Size, y.LastModified, y.LastModified, this.checkChild(y.Key), getFilterPath(y.Key, path))).ToList();
             }
@@ -79,6 +81,17 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
             readResponse.CWD = cwd;
             return readResponse;
         }
+
+        private string setFilterPath(string pathString)
+        {
+            return pathString.Substring(0, pathString.Length - pathString.Split("/")[pathString.Split("/").Length - 2].Length - 1).Substring(RootName.Length - 1);
+        }
+
+        private string setFilename(string fileName, string path)
+        {
+            return fileName.Replace(RootName.Replace("/", "") + path, "").Replace("/", "");
+        }
+
         private FileManagerDirectoryContent CreateDirectoryContentInstance(string name, bool value, string type, long size, DateTime createddate, DateTime modifieddate, bool child, string filterpath)
         {
             FileManagerDirectoryContent tempFile = new FileManagerDirectoryContent();
@@ -569,7 +582,8 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
                 List<string> existFiles = new List<string>();
                 foreach (IFormFile file in uploadFiles)
                 {
-                    string name = file.FileName;
+                    string[] folders = file.FileName.Split('/');
+                    string name = folders[folders.Length - 1];
                     string fullName = Path.Combine(Path.GetTempPath(), name);
                     if (uploadFiles != null)
                     {
@@ -579,12 +593,12 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
                             {
                                 using (FileStream fsSource = new FileStream(Path.Combine(Path.GetTempPath(), fileName), FileMode.Create))
                                 {
-                                    uploadFiles[0].CopyTo(fsSource);
+                                    file.CopyTo(fsSource);
                                     fsSource.Close();
                                 }
                                 using (FileStream fileToUpload = new FileStream(Path.Combine(Path.GetTempPath(), fileName), FileMode.Open, FileAccess.Read))
                                 {
-                                    await fileTransferUtility.UploadAsync(fileToUpload, bucketName, RootName.Replace("/", "") + path + file.FileName);
+                                    await fileTransferUtility.UploadAsync(fileToUpload, bucketName, RootName.Replace("/", "") + path + fileName);
                                 }
                             }
                             else
