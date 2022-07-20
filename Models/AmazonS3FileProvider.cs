@@ -65,7 +65,7 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
             try
             {
                 if (response.CommonPrefixes.Count > 0) {
-                    files = response.CommonPrefixes.Select((y, i) => CreateDirectoryContentInstance(setFilename(response.CommonPrefixes[i], path), false, "Folder", 0, new DateTime(), new DateTime(), this.checkChild(response.CommonPrefixes[i]), setFilterPath(y))).ToList();
+                    files = response.CommonPrefixes.Select((y, i) => CreateDirectoryContentInstance(getFileName(response.CommonPrefixes[i], path), false, "Folder", 0, new DateTime(), new DateTime(), this.checkChild(response.CommonPrefixes[i]), getFilePath(y))).ToList();
                 }
             }
             catch (Exception ex) { throw ex; }
@@ -82,12 +82,12 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
             return readResponse;
         }
 
-        private string setFilterPath(string pathString)
+        private string getFilePath(string pathString)
         {
             return pathString.Substring(0, pathString.Length - pathString.Split("/")[pathString.Split("/").Length - 2].Length - 1).Substring(RootName.Length - 1);
         }
 
-        private string setFilename(string fileName, string path)
+        private string getFileName(string fileName, string path)
         {
             return fileName.Replace(RootName.Replace("/", "") + path, "").Replace("/", "");
         }
