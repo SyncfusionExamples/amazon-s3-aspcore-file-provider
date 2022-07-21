@@ -80,6 +80,22 @@ namespace EJ2AmazonS3ASPCoreFileProvider.Controllers
             FileManagerResponse uploadResponse;
             FileManagerDirectoryContent[] dataObject = new FileManagerDirectoryContent[1];
             dataObject[0] = JsonConvert.DeserializeObject<FileManagerDirectoryContent>(data);
+            foreach (var file in uploadFiles)
+            {
+                var folders = (file.FileName).Split('/');
+                // checking the folder upload
+                if (folders.Length > 1)
+                {
+                    for (var i = 0; i < folders.Length - 1; i++)
+                    {
+                        if (!this.operation.checkFileExist(path, folders[i]))
+                        {
+                            this.operation.ToCamelCase(this.operation.Create(path, folders[i], dataObject));
+                        }
+                        path += folders[i] + "/";
+                    }
+                }
+            }
             uploadResponse = operation.Upload(path, uploadFiles, action, dataObject);
             if (uploadResponse.Error != null)
             {
