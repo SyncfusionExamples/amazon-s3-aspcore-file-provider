@@ -39,7 +39,7 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
         public void GetBucketList()
         {
             ListingObjectsAsync("", "", false).Wait();
-            RootName = response.S3Objects.First().Key;
+            RootName = response.S3Objects.Where(x => x.Key.Split(".").Length != 2).First().Key;
         }
 
         // Reads the file(s) and folder(s)
