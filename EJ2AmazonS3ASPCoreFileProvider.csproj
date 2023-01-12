@@ -9,8 +9,7 @@
   </ItemGroup>
 
   <ItemGroup>
-	<PackageReference Include="AWSSDK.S3" Version="3.3.104.13" />
-	<PackageReference Include="Microsoft.AspNetCore.Razor.Design" Version="2.1.2" PrivateAssets="All" />
+	<PackageReference Include="AWSSDK.S3" Version="3.7.101.52" />
 	<PackageReference Include="Syncfusion.EJ2.AspNet.Core" Version="*" />
   </ItemGroup>
 
