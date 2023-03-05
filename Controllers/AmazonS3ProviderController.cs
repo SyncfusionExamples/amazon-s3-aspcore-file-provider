@@ -23,6 +23,7 @@ namespace EJ2AmazonS3ASPCoreFileProvider.Controllers
         public AmazonS3ProviderController(IWebHostEnvironment hostingEnvironment)
         {
             this.basePath = hostingEnvironment.ContentRootPath;
+            this.basePath = basePath.Replace("../", "");
             this.operation = new AmazonS3FileProvider();
             this.operation.RegisterAmazonS3("<---bucketName--->", "<---awsAccessKeyId--->", "<---awsSecretAccessKey--->", "<---region--->");
         }

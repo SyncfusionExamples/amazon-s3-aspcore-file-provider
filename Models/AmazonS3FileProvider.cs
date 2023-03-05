@@ -40,6 +40,7 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
         {
             ListingObjectsAsync("", "", false).Wait();
             RootName = response.S3Objects.Where(x => x.Key.Split(".").Length != 2).First().Key;
+            RootName = RootName.Replace("../", "");
         }
 
         // Reads the file(s) and folder(s)
@@ -578,6 +579,7 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
             try
             {
                 string fileName = Path.GetFileName(uploadFiles[0].FileName);
+                fileName = fileName.Replace("../", "");
                 GetBucketList();
                 List<string> existFiles = new List<string>();
                 foreach (IFormFile file in uploadFiles)
@@ -585,6 +587,7 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
                     string[] folders = file.FileName.Split('/');
                     string name = folders[folders.Length - 1];
                     string fullName = Path.Combine(Path.GetTempPath(), name);
+                    fullName = fullName.Replace("../", "");
                     if (uploadFiles != null)
                     {
                         if (action == "save")
@@ -689,6 +692,7 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
                 GetBucketList();
                 ListingObjectsAsync("/", RootName.Replace("/", "") + path, false).Wait();
                 string fileName = path.ToString().Split("/").Last();
+                fileName = fileName.Replace("../", "");
                 Stream stream = fileTransferUtility.OpenStream(bucketName, RootName.Replace("/", "") + path);
                 return new FileStreamResult(stream, "APPLICATION/octet-stream");
             }
