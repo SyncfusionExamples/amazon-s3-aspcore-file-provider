@@ -512,16 +512,20 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
         }
 
         // Renames a file or folder
-        public FileManagerResponse Rename(string path, string name, string newName, bool replace = false, params FileManagerDirectoryContent[] data)
+        public FileManagerResponse Rename(string path, string name, string newName, bool replace = false, bool showFileExtension = true, params FileManagerDirectoryContent[] data)
         {
-            return AsyncRename(path, name, newName, replace, data).Result;
+            return AsyncRename(path, name, newName, replace, showFileExtension, data).Result;
         }
-        public virtual async Task<FileManagerResponse> AsyncRename(string path, string name, string newName, bool replace, params FileManagerDirectoryContent[] data)
+        public virtual async Task<FileManagerResponse> AsyncRename(string path, string name, string newName, bool replace, bool showFileExtension, params FileManagerDirectoryContent[] data)
         {
             GetBucketList();
             FileManagerResponse renameResponse = new FileManagerResponse();
             FileManagerDirectoryContent cwd = new FileManagerDirectoryContent();
             List<FileManagerDirectoryContent> files = new List<FileManagerDirectoryContent>();
+            if (!showFileExtension)
+            {
+                newName = newName + data[0].Type;
+            }
             if (checkFileExist(data[0].FilterPath, newName))
             {
                 ErrorDetails er = new ErrorDetails();
