@@ -51,6 +51,7 @@ namespace EJ2AmazonS3ASPCoreFileProvider.Controllers
                     return this.operation.ToCamelCase(this.operation.GetFiles(args.Path, false, args.Data));
                 case "delete":
                     // deletes the selected file(s) or folder(s) from the given path.
+                    this.operation.Response = Response;
                     return this.operation.ToCamelCase(this.operation.Delete(args.Path, args.Names, args.Data));
                 case "copy":
                     // copies the selected file(s) or folder(s) from a path and then pastes them into a given target path.

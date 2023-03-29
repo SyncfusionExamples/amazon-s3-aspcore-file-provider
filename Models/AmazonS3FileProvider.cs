@@ -24,6 +24,7 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
         static ListObjectsResponse childResponse;
         public string RootName;
         long sizeValue = 0;
+        internal HttpResponse Response;
         List<FileManagerDirectoryContent> s3ObjectFiles = new List<FileManagerDirectoryContent>();
         TransferUtility fileTransferUtility = new TransferUtility(client);
 
@@ -120,6 +121,10 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
             FileManagerResponse removeResponse = new FileManagerResponse();
             try
             {
+                if (Response.HttpContext.Request.Host.Value == "ej2.syncfusion.com")
+                {
+                    throw new UnauthorizedAccessException("File Manager's delete functionality is restricted in the online demo. If you need to test delete functionality, please install Syncfusion Essential Studio on your machine and run the demo");
+                }
                 List<FileManagerDirectoryContent> files = new List<FileManagerDirectoryContent>();
                 GetBucketList();
                 if (path == "/") ListingObjectsAsync("/", RootName , false).Wait(); else ListingObjectsAsync("/", this.RootName.Replace("/", "") + path, false).Wait();
@@ -145,7 +150,14 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
                 await DeleteDirectory(path, names);
                 removeResponse.Files = files;
             }
-            catch (Exception ex) { throw ex; }
+            catch (Exception ex)
+            {
+                ErrorDetails er = new ErrorDetails();
+                er.Message = ex.Message.ToString();
+                er.Code =  er.Message.Contains("Syncfusion Essential Studio") ? "401" : "417";
+                removeResponse.Error = er;
+                return removeResponse;
+            }
             return removeResponse;
         }
 
