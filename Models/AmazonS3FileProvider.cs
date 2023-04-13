@@ -1104,7 +1104,7 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
                                 permission = UpdateFileRules(permission, fileRule);
                             }
                         }
-                        else if ((fileRule.Path) == (Path.GetFileNameWithoutExtension(location)) || fileRule.Path == location || ((fileRule.Path) == (Path.GetFileNameWithoutExtension(fileRule.Path))))
+                        else if ((fileRule.Path) == (Path.GetFileNameWithoutExtension(location)) || fileRule.Path == location || (fileRule.Path + nameExtension == location))
                         {
                             permission = UpdateFileRules(permission, fileRule);
                         }
