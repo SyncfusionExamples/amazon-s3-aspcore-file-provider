@@ -23,6 +23,9 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
         static ListObjectsResponse response;
         static ListObjectsResponse childResponse;
         public string RootName;
+        private string rootName = string.Empty;
+        private string accessMessage = string.Empty;
+        AccessDetails AccessDetails = new AccessDetails();
         long sizeValue = 0;
         List<FileManagerDirectoryContent> s3ObjectFiles = new List<FileManagerDirectoryContent>();
         TransferUtility fileTransferUtility = new TransferUtility(client);
@@ -33,6 +36,7 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
             bucketName = name;
             RegionEndpoint bucketRegion = RegionEndpoint.GetBySystemName(region);
             client = new AmazonS3Client(awsAccessKeyId, awsSecretAccessKey, bucketRegion);
+            GetBucketList();
         }
 
         //Define the root directory to the file manager
@@ -41,6 +45,12 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
             ListingObjectsAsync("", "", false).Wait();
             RootName = response.S3Objects.Where(x => x.Key.Split(".").Length != 2).First().Key;
             RootName = RootName.Replace("../", "");
+        }
+        public void SetRules(AccessDetails details)
+        {
+            this.AccessDetails = details;
+            DirectoryInfo root = new DirectoryInfo(RootName);
+            this.rootName = root.ToString();
         }
 
         // Reads the file(s) and folder(s)
@@ -56,7 +66,7 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
                 if (path == "/") ListingObjectsAsync("/", RootName , false).Wait(); else ListingObjectsAsync("/", this.RootName.Replace("/", "") + path, false).Wait();
                 if (path == "/")
                 {
-                    FileManagerDirectoryContent[] s = response.S3Objects.Where(x => x.Key == RootName).Select(y => CreateDirectoryContentInstance(y.Key.ToString().Replace("/", ""), true, "Folder", y.Size, y.LastModified, y.LastModified, this.checkChild(y.Key), string.Empty)).ToArray();
+                    FileManagerDirectoryContent[] s = response.S3Objects.Where(x => x.Key == RootName).Select(y => CreateDirectoryContentInstance(y.Key.ToString().Replace("/", ""), false, "Folder", y.Size, y.LastModified, y.LastModified, this.checkChild(y.Key), string.Empty)).ToArray();
                     if (s.Length > 0) cwd = s[0];
                 }
                 else
@@ -78,8 +88,26 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
             }
             catch (Exception ex) { throw ex; }
             if (filesS3.Count != 0) files = files.Union(filesS3).ToList();
-            readResponse.Files = files;
             readResponse.CWD = cwd;
+            try
+            {
+                if ((cwd.Permission != null && !cwd.Permission.Read))
+                {
+                    readResponse.Files = null;
+                    accessMessage = cwd.Permission.Message;
+                    throw new UnauthorizedAccessException("'" + cwd.Name + "' is not accessible. You need permission to perform the read action.");
+                }
+            }
+            catch (Exception e)
+            {
+                ErrorDetails er = new ErrorDetails();
+                er.Message = e.Message.ToString();
+                er.Code = er.Message.Contains("is not accessible. You need permission") ? "401" : "417";
+                if ((er.Code == "401") && !string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
+                readResponse.Error = er;
+                return readResponse;
+            }
+            readResponse.Files = files;
             return readResponse;
         }
 
@@ -104,6 +132,7 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
             tempFile.DateModified = modifieddate;
             tempFile.HasChild = child;
             tempFile.FilterPath = filterpath;
+            tempFile.Permission= GetPathPermission(filterpath + (value ? name :Path.GetFileNameWithoutExtension(name)), value);
             return tempFile;
         }
 
@@ -125,6 +154,14 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
                 if (path == "/") ListingObjectsAsync("/", RootName , false).Wait(); else ListingObjectsAsync("/", this.RootName.Replace("/", "") + path, false).Wait();
                 foreach (string name in names)
                 {
+                    foreach (FileManagerDirectoryContent item in data) {
+                        AccessPermission PathPermission = GetPathPermission(item.FilterPath + item.Name, data[0].IsFile);
+                        if (PathPermission != null && (!PathPermission.Read || !PathPermission.Write))
+                        {
+                            accessMessage = PathPermission.Message;
+                            throw new UnauthorizedAccessException("'" + name + "' is not accessible.  You need permission to perform the write action.");
+                        }
+                    }
                     if (response.CommonPrefixes.Count > 1)
                     {
                         foreach (string commonPrefix in response.CommonPrefixes)
@@ -144,9 +181,16 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
                 }
                 await DeleteDirectory(path, names);
                 removeResponse.Files = files;
+                return removeResponse;
             }
-            catch (Exception ex) { throw ex; }
-            return removeResponse;
+            catch (Exception ex) {
+                ErrorDetails er = new ErrorDetails();
+                er.Message = ex.Message.ToString();
+                er.Code = er.Message.Contains(" is not accessible.  You need permission") ? "401" : "417";
+                if ((er.Code == "401") && !string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
+                removeResponse.Error = er;
+                return removeResponse;
+            }
         }
 
         // Copy the file(s) or folder(s) from a source directory and pastes in given target directory
@@ -172,6 +216,22 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
             try
             {
                 GetBucketList();
+                AccessPermission PathPermission = GetPathPermission(data[0].FilterPath + data[0].Name, false);
+                if(isCutRequest) { 
+                    if (PathPermission != null && (!PathPermission.Read || !PathPermission.Write))
+                    {
+                        accessMessage = PathPermission.Message;
+                        throw new UnauthorizedAccessException("'" + data[0].Name + "' is not accessible. You need permission to perform the Write action.");
+                    }
+                }
+                else
+                {
+                    if (PathPermission != null && (!PathPermission.Read || !PathPermission.Copy))
+                    {
+                        accessMessage = PathPermission.Message;
+                        throw new UnauthorizedAccessException("'" + data[0].Name + "' is not accessible. You need permission to perform the copy action.");
+                    }
+                }
                 FileManagerResponse readResponse = new FileManagerResponse();
                 if (targetPath == "/") ListingObjectsAsync("/", RootName, false).Wait(); else ListingObjectsAsync("/", this.RootName.Replace("/", "") + targetPath, false).Wait();
                 if (targetPath == "/")
@@ -260,7 +320,15 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
                     }
                 }
             }
-            catch (Exception ex) { throw ex; }
+            catch (Exception ex) {
+                ErrorDetails error = new ErrorDetails();
+                error.Message = ex.Message.ToString();
+                error.Code = error.Message.Contains("is not accessible. You need permission") ? "401" : "404";
+                if ((error.Code == "401") && !string.IsNullOrEmpty(accessMessage)) { error.Message = accessMessage; }
+                error.FileExists = moveResponse.Error?.FileExists;
+                moveResponse.Error = error;
+                return moveResponse;
+            }
             if (names[0].Contains("/"))
             {
                 foreach (var x in names.Select((name, index) => new { name, index }))
@@ -455,6 +523,7 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
         public FileManagerResponse Create(string path, string name, params FileManagerDirectoryContent[] data)
         {
             FileManagerResponse createResponse = new FileManagerResponse();
+            AccessPermission PathPermission = GetPathPermission(data[0].FilterPath+ data[0].Name, false);
             if (checkFileExist(path, name))
             {
                 ErrorDetails er = new ErrorDetails();
@@ -467,6 +536,11 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
             {
                 try
                 {
+                    if (PathPermission != null && (!PathPermission.Read || !PathPermission.WriteContents))
+                    {
+                        accessMessage = PathPermission.Message;
+                        throw new UnauthorizedAccessException("'" + name + "' is not accessible. You need permission to perform the writeContents action.");
+                    }
                     GetBucketList();
                     FileManagerDirectoryContent CreateData = new FileManagerDirectoryContent();
                     string key = string.Format(@"{0}/", RootName.Replace("/", "") + path + name);
@@ -476,10 +550,17 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
                     CreateData = CreateDirectoryContentInstance(name, false, "Folder", 0, DateTime.Now, DateTime.Now, false, path);
                     FileManagerDirectoryContent[] newData = new FileManagerDirectoryContent[] { CreateData };
                     createResponse.Files = newData;
+                    return createResponse;
                 }
-                catch (Exception ex) { throw ex; }
+                catch (Exception ex) {
+                    ErrorDetails er = new ErrorDetails();
+                    er.Message = ex.Message.ToString();
+                    er.Code = er.Message.Contains("is not accessible. You need permission") ? "401" : "417";
+                    if ((er.Code == "401") && !string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
+                    createResponse.Error = er;
+                    return createResponse;
+                }
             }
-            return createResponse;
         }
 
         // Search for file(s) or folder(s)
@@ -521,6 +602,7 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
             GetBucketList();
             FileManagerResponse renameResponse = new FileManagerResponse();
             FileManagerDirectoryContent cwd = new FileManagerDirectoryContent();
+            AccessPermission PathPermission = GetPathPermission(data[0].FilterPath + data[0].Name, data[0].IsFile);
             List<FileManagerDirectoryContent> files = new List<FileManagerDirectoryContent>();
             if (!showFileExtension)
             {
@@ -539,6 +621,11 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
                 await MoveDirectoryAsync((RootName.Replace("/", "") + data[0].FilterPath + name + "/"), (RootName.Replace("/", "") + data[0].FilterPath + newName + "/"), data[0].IsFile, true);
                 try
                 {
+                    if (PathPermission != null && (!PathPermission.Read || !PathPermission.Write))
+                    {
+                        accessMessage = PathPermission.Message;
+                        throw new UnauthorizedAccessException();
+                    }
                     GetBucketList();
                     FileManagerResponse readResponse = new FileManagerResponse();
                     if (path == "/") ListingObjectsAsync("/", RootName , false).Wait(); else ListingObjectsAsync("/", this.RootName.Replace("/", "") + path, false).Wait();
@@ -564,10 +651,18 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
                                 files.Add(CreateDirectoryContentInstance(S3Object.Key.Split("/").Last(), true, Path.GetExtension(S3Object.Key), S3Object.Size, S3Object.LastModified, S3Object.LastModified, false, data[0].FilterPath));
                         }
                     }
+                    renameResponse.Files = files;
+                    return renameResponse;
                 }
-                catch (Exception ex) { throw ex; }
-                renameResponse.Files = files;
-                return renameResponse;
+                catch (Exception ex) {
+                    ErrorDetails er = new ErrorDetails();
+                    er.Message = (ex.GetType().Name == "UnauthorizedAccessException") ? "'" + name + "' is not accessible. You need permission to perform the write action." : ex.Message.ToString();
+                    er.Code = er.Message.Contains("is not accessible. You need permission") ? "401" : "417";
+                    if ((er.Code == "401") && !string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
+                    renameResponse.Error = er;
+                    renameResponse.Files = files;
+                    return renameResponse;
+                }
             }
         }
 
@@ -580,8 +675,14 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
         public virtual async Task<FileManagerResponse> AsyncUpload(string path, IList<IFormFile> uploadFiles, string action, FileManagerDirectoryContent[] data)
         {
             FileManagerResponse uploadResponse = new FileManagerResponse();
+            AccessPermission PathPermission = GetPathPermission(data[0].FilterPath + data[0].Name, false);
             try
             {
+                if (PathPermission != null && (!PathPermission.Read || !PathPermission.Upload))
+                {
+                    accessMessage = PathPermission.Message;
+                    throw new UnauthorizedAccessException("'" + data[0].Name + "' is not accessible. You need permission to perform the upload action.");
+                }
                 string fileName = Path.GetFileName(uploadFiles[0].FileName);
                 fileName = fileName.Replace("../", "");
                 GetBucketList();
@@ -683,9 +784,16 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
                     er.Message = "File Already Exists";
                     uploadResponse.Error = er;
                 }
+                return uploadResponse;
             }
-            catch (Exception ex) { throw ex; }
-            return uploadResponse;
+            catch (Exception ex) {
+                ErrorDetails er = new ErrorDetails();
+                er.Message = (ex.GetType().Name == "UnauthorizedAccessException") ? "'" + data[0].Name + "' is not accessible. You need permission to perform the upload action." : ex.Message.ToString();
+                er.Code = er.Message.Contains("is not accessible. You need permission") ? "401" : "417";
+                if ((er.Code == "401") && !string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
+                uploadResponse.Error = er;
+                return uploadResponse;
+            }
         }
 
         // Returns the image
@@ -693,6 +801,11 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
         {
             try
             {
+                AccessPermission PathPermission = GetPathPermission(path, false);
+                if (PathPermission != null && !PathPermission.Read)
+                {
+                    return null;
+                }
                 GetBucketList();
                 ListingObjectsAsync("/", RootName.Replace("/", "") + path, false).Wait();
                 string fileName = path.ToString().Split("/").Last();
@@ -717,11 +830,17 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
             {
                 try
                 {
+                    AccessPermission PathPermission = GetPathPermission(path + Names[0], true);
+                    if (PathPermission != null && (!PathPermission.Read || !PathPermission.Download))
+                    {
+                        throw new UnauthorizedAccessException("'" + Names + "' is not accessible. Access is denied.");
+                    }
                     GetBucketList();
                     ListingObjectsAsync("/", RootName.Replace("/", "") + path, false).Wait();
                     Stream stream = fileTransferUtility.OpenStream(bucketName, RootName.Replace("/", "") + path + Names[0]);
                     fileStreamResult = new FileStreamResult(stream, "APPLICATION/octet-stream");
                     fileStreamResult.FileDownloadName = Names[0].Contains("/") ? Names[0].Split("/").Last() : Names[0];
+                    return fileStreamResult;
                 }
                 catch (AmazonS3Exception amazonS3Exception) { throw amazonS3Exception; }
             }
@@ -734,6 +853,11 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
                     Directory.CreateDirectory(tempFolder);
                     foreach (string folderName in Names)
                     {
+                        AccessPermission PathPermission = GetPathPermission(path + folderName, Path.GetExtension(folderName) == ""? false:true);
+                        if (PathPermission != null && (!PathPermission.Read || !PathPermission.Download))
+                        {
+                            throw new UnauthorizedAccessException("'" + folderName + "' is not accessible. Access is denied.");
+                        }
                         string fileName = null;
                         fileName = (Names[0].Contains("/")) ? Path.Combine(tempFolder, folderName.Split("/").Last()) : Path.Combine(tempFolder, folderName.Split("/").Last());
                         GetBucketList();
@@ -762,10 +886,10 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
                     fileStreamResult.FileDownloadName = "Files.zip";
                     if (System.IO.File.Exists(Path.Combine(Path.GetTempPath(), "tempFolder.zip"))) System.IO.File.Delete(Path.Combine(Path.GetTempPath(), "tempFolder.zip"));
                     if (System.IO.File.Exists(tempFolder)) System.IO.File.Delete(tempFolder); else if (Directory.Exists(tempFolder)) Directory.Delete(tempFolder, true);
+                    return fileStreamResult;
                 }
                 catch (AmazonS3Exception amazonS3Exception) { throw amazonS3Exception; }
             }
-            return fileStreamResult;
         }
 
         // Deletes a Directory
@@ -891,6 +1015,128 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
         public string ToCamelCase(FileManagerResponse userData)
         {
             return JsonConvert.SerializeObject(userData, new JsonSerializerSettings { ContractResolver = new DefaultContractResolver { NamingStrategy = new CamelCaseNamingStrategy() } });
+        }
+        protected virtual string[] GetFolderDetails(string path)
+        {
+            string[] str_array = path.Split('/'), fileDetails = new string[2];
+            string parentPath = "";
+            for (int i = 0; i < str_array.Length - 1; i++)
+            {
+                parentPath += str_array[i] + "/";
+            }
+            fileDetails[0] = parentPath;
+            fileDetails[1] = str_array[str_array.Length - 1];
+            return fileDetails;
+        }
+        protected virtual AccessPermission GetPathPermission(string path, bool isFile)
+        {
+            string[] fileDetails = GetFolderDetails(path);
+            if (isFile)
+            {
+                return GetPermission(fileDetails[0].TrimStart('/')+ fileDetails[1], fileDetails[1], true);
+            }
+            return GetPermission(fileDetails[0].TrimStart('/') + fileDetails[1], fileDetails[1], false);
+
+        }
+        protected virtual AccessPermission GetPermission(string location, string name, bool isFile )
+        {
+            AccessPermission permission = new AccessPermission();
+            if (!isFile)
+            {
+                if (this.AccessDetails.AccessRules == null) { return null; }
+                foreach (AccessRule folderRule in AccessDetails.AccessRules)
+                {
+                    if (folderRule.Path != null && folderRule.IsFile == false && (folderRule.Role == null || folderRule.Role == AccessDetails.Role))
+                    {
+                        if (folderRule.Path.IndexOf("*") > -1)
+                        {
+                            string parentPath = folderRule.Path.Substring(0, folderRule.Path.IndexOf("*"));
+                            if ((location).IndexOf((parentPath)) == 0 || parentPath == "")
+                            {
+                                permission = UpdateFolderRules(permission, folderRule);
+                            }
+                        }
+                        else if ((folderRule.Path) == (location) || (folderRule.Path) == (location + Path.DirectorySeparatorChar) || (folderRule.Path) == (location + "/"))
+                        {
+                            permission = UpdateFolderRules(permission, folderRule);
+                        }
+                        else if ((location).IndexOf((folderRule.Path)) == 0)
+                        {
+                            permission = UpdateFolderRules(permission, folderRule);
+                        }
+                    }
+                }
+                return permission;
+            }
+            else
+            {
+                if (this.AccessDetails.AccessRules == null) return null;
+                string nameExtension = Path.GetExtension(name).ToLower();
+                string fileName = Path.GetFileNameWithoutExtension(name);
+                //string currentPath = GetPath(location);
+                string currentPath = (location +"/");
+                foreach (AccessRule fileRule in AccessDetails.AccessRules)
+                {
+                    if (!string.IsNullOrEmpty(fileRule.Path) && fileRule.IsFile && (fileRule.Role == null || fileRule.Role == AccessDetails.Role))
+                    {
+                        if (fileRule.Path.IndexOf("*.*") > -1)
+                        {
+                            string parentPath = fileRule.Path.Substring(0, fileRule.Path.IndexOf("*.*"));
+                            if (currentPath.IndexOf((parentPath)) == 0 || parentPath == "")
+                            {
+                                permission = UpdateFileRules(permission, fileRule);
+                            }
+                        }
+                        else if (fileRule.Path.IndexOf("*.") > -1)
+                        {
+                            string pathExtension = Path.GetExtension(fileRule.Path).ToLower();
+                            string parentPath = fileRule.Path.Substring(0, fileRule.Path.IndexOf("*."));
+                            if (((parentPath) == currentPath || parentPath == "") && nameExtension == pathExtension) {
+                                permission = UpdateFileRules(permission, fileRule);
+                            }
+                        }
+                        else if (fileRule.Path.IndexOf(".*") > -1)
+                        {
+                            string pathName = Path.GetFileNameWithoutExtension(fileRule.Path);
+                            string parentPath = fileRule.Path.Substring(0, fileRule.Path.IndexOf(pathName + ".*"));
+                            if (((parentPath) == currentPath || parentPath == "") && fileName == pathName)
+                            {
+                                permission = UpdateFileRules(permission, fileRule);
+                            }
+                        }
+                        else if ((fileRule.Path) == (Path.GetFileNameWithoutExtension(location)) || fileRule.Path == location || ((fileRule.Path) == (Path.GetFileNameWithoutExtension(fileRule.Path))))
+                        {
+                            permission = UpdateFileRules(permission, fileRule);
+                        }
+                    }
+                }
+                return permission;
+            }
+
+        }
+        protected virtual bool HasPermission(Permission rule)
+        {
+            return rule == Permission.Allow ? true : false;
+        }
+        protected virtual AccessPermission UpdateFolderRules(AccessPermission folderPermission, AccessRule folderRule)
+        {
+            folderPermission.Copy = HasPermission(folderRule.Copy);
+            folderPermission.Download = HasPermission(folderRule.Download);
+            folderPermission.Write = HasPermission(folderRule.Write);
+            folderPermission.WriteContents = HasPermission(folderRule.WriteContents);
+            folderPermission.Read = HasPermission(folderRule.Read);
+            folderPermission.Upload = HasPermission(folderRule.Upload);
+            folderPermission.Message = string.IsNullOrEmpty(folderRule.Message) ? string.Empty : folderRule.Message;
+            return folderPermission;
+        }
+        protected virtual AccessPermission UpdateFileRules(AccessPermission filePermission, AccessRule fileRule)
+        {
+            filePermission.Copy = HasPermission(fileRule.Copy);
+            filePermission.Download = HasPermission(fileRule.Download);
+            filePermission.Write = HasPermission(fileRule.Write);
+            filePermission.Read = HasPermission(fileRule.Read);
+            filePermission.Message = string.IsNullOrEmpty(fileRule.Message) ? string.Empty : fileRule.Message;
+            return filePermission;
         }
     }
 }
