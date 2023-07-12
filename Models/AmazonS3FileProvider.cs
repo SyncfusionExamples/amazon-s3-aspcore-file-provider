@@ -921,10 +921,7 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
             try
             {
                 ListObjectsRequest request = new ListObjectsRequest { BucketName = bucketName, Delimiter = delimiter, Prefix = prefix };
-                if (childCheck)
-                    return await client.ListObjectsAsync(request);
-                else
-                    return await client.ListObjectsAsync(request);
+                return await client.ListObjectsAsync(request);
             }
             catch (AmazonS3Exception amazonS3Exception) { throw amazonS3Exception; }
         }
