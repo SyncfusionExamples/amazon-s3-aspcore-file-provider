@@ -819,77 +819,114 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
         // Download file(s) or folder(s)
         public virtual FileStreamResult Download(string path, string[] Names, params FileManagerDirectoryContent[] data)
         {
+            return DownloadAsync(path, Names, data).GetAwaiter().GetResult();
+        }
+
+        public virtual async Task<FileStreamResult> DownloadAsync(string path, string[] names, params FileManagerDirectoryContent[] data)
+        {
             GetBucketList();
             FileStreamResult fileStreamResult = null;
-            if (Names.Length == 1)
+
+            if (names.Length == 1)
             {
                 GetBucketList();
-                ListingObjectsAsync("/", RootName.Replace("/", "") + path + Names[0], false).Wait();
+                await ListingObjectsAsync("/", RootName.Replace("/", "") + path + names[0], false);
             }
-            if (Names.Length == 1 && response.CommonPrefixes.Count == 0)
+
+            if (names.Length == 1 && response.CommonPrefixes.Count == 0)
             {
                 try
                 {
-                    AccessPermission PathPermission = GetPathPermission(path + Names[0], true);
-                    if (PathPermission != null && (!PathPermission.Read || !PathPermission.Download))
+                    AccessPermission pathPermission = GetPathPermission(path + names[0], true);
+                    if (pathPermission != null && (!pathPermission.Read || !pathPermission.Download))
                     {
-                        throw new UnauthorizedAccessException("'" + Names + "' is not accessible. Access is denied.");
+                        throw new UnauthorizedAccessException("'" + names[0] + "' is not accessible. Access is denied.");
                     }
+
                     GetBucketList();
-                    ListingObjectsAsync("/", RootName.Replace("/", "") + path, false).Wait();
-                    Stream stream = fileTransferUtility.OpenStream(bucketName, RootName.Replace("/", "") + path + Names[0]);
+                    await ListingObjectsAsync("/", RootName.Replace("/", "") + path, false);
+
+                    Stream stream = await fileTransferUtility.OpenStreamAsync(bucketName, RootName.Replace("/", "") + path + names[0]);
+
                     fileStreamResult = new FileStreamResult(stream, "APPLICATION/octet-stream");
-                    fileStreamResult.FileDownloadName = Names[0].Contains("/") ? Names[0].Split("/").Last() : Names[0];
+                    fileStreamResult.FileDownloadName = names[0].Contains("/") ? names[0].Split("/").Last() : names[0];
+
                     return fileStreamResult;
                 }
-                catch (AmazonS3Exception amazonS3Exception) { throw amazonS3Exception; }
+                catch (AmazonS3Exception amazonS3Exception)
+                {
+                    throw amazonS3Exception;
+                }
             }
             else
             {
                 try
                 {
-                    string tempFolder = Path.Combine(Path.GetTempPath(), "tempFolder");
-                    if (System.IO.File.Exists(tempFolder)) System.IO.File.Delete(tempFolder); else if (Directory.Exists(tempFolder)) Directory.Delete(tempFolder, true);
-                    Directory.CreateDirectory(tempFolder);
-                    foreach (string folderName in Names)
+                    var memoryStream = new MemoryStream();
+
+                    using (var archive = new ZipArchive(memoryStream, ZipArchiveMode.Create, true))
                     {
-                        AccessPermission PathPermission = GetPathPermission(path + folderName, Path.GetExtension(folderName) == ""? false:true);
-                        if (PathPermission != null && (!PathPermission.Read || !PathPermission.Download))
+                        foreach (string folderName in names)
                         {
-                            throw new UnauthorizedAccessException("'" + folderName + "' is not accessible. Access is denied.");
-                        }
-                        string fileName = null;
-                        fileName = (Names[0].Contains("/")) ? Path.Combine(tempFolder, folderName.Split("/").Last()) : Path.Combine(tempFolder, folderName.Split("/").Last());
-                        GetBucketList();
-                        ListingObjectsAsync("/", RootName.Replace("/", "") + path + folderName, false).Wait();
-                        if (response.CommonPrefixes.Count == 0)
-                        {
-                            if (Directory.Exists(fileName)) Directory.Delete(fileName); else if (System.IO.File.Exists(fileName)) System.IO.File.Delete(fileName);
-                            FileStream fs = System.IO.File.Create(fileName);
-                            fs.Close();
-                            fileTransferUtility.Download(fileName, bucketName, RootName.Replace("/", "") + path + folderName);
-                        }
-                        else
-                        {
-                            if (System.IO.File.Exists(fileName)) System.IO.File.Delete(fileName); else if (Directory.Exists(fileName)) Directory.Delete(fileName, true);
-                            Directory.CreateDirectory(fileName);
-                            if (folderName.Contains("/"))
-                                fileTransferUtility.DownloadDirectory(bucketName, RootName.Replace("/", "") + path + (String.IsNullOrEmpty(Path.GetExtension(folderName.Split("/").Last())) ? folderName + "/" : folderName), fileName);
-                            else
-                                fileTransferUtility.DownloadDirectory(bucketName, RootName.Replace("/", "") + path + folderName, fileName);
+                            AccessPermission pathPermission = GetPathPermission(path + folderName, Path.GetExtension(folderName) == "" ? false : true);
+                            if (pathPermission != null && (!pathPermission.Read || !pathPermission.Download))
+                            {
+                                throw new UnauthorizedAccessException("'" + folderName + "' is not accessible. Access is denied.");
+                            }
+
+                            var initialResponse = await GetRecursiveResponse("/", RootName.Replace("/", "") + path + folderName, false);
+                            await DownloadSubdirectories(archive, folderName, path + folderName, RootName.Replace("/", "") + path + folderName, initialResponse);
                         }
                     }
-                    string tempPath = Path.Combine(Path.GetTempPath(), "tempFolder.zip");
-                    ZipFile.CreateFromDirectory(tempFolder, tempPath);
-                    FileStream fileStreamInput = new FileStream(tempPath, FileMode.Open, FileAccess.Read, FileShare.Delete);
-                    fileStreamResult = new FileStreamResult(fileStreamInput, "APPLICATION/octet-stream");
+
+                    memoryStream.Seek(0, SeekOrigin.Begin);
+
+                    fileStreamResult = new FileStreamResult(memoryStream, "APPLICATION/octet-stream");
                     fileStreamResult.FileDownloadName = "Files.zip";
-                    if (System.IO.File.Exists(Path.Combine(Path.GetTempPath(), "tempFolder.zip"))) System.IO.File.Delete(Path.Combine(Path.GetTempPath(), "tempFolder.zip"));
-                    if (System.IO.File.Exists(tempFolder)) System.IO.File.Delete(tempFolder); else if (Directory.Exists(tempFolder)) Directory.Delete(tempFolder, true);
+
                     return fileStreamResult;
                 }
-                catch (AmazonS3Exception amazonS3Exception) { throw amazonS3Exception; }
+                catch (AmazonS3Exception amazonS3Exception)
+                {
+                    throw amazonS3Exception;
+                }
             }
+        }
+
+        private async Task DownloadSubdirectories(ZipArchive archive, string folderName, string folderPath, string s3FolderPath, ListObjectsResponse response)
+        {
+            foreach (var item in response.S3Objects)
+            {
+                string filePath = item.Key.Substring(item.Key.IndexOf(folderName));
+                string s3FilePath = s3FolderPath;
+
+                Stream fileStream = await fileTransferUtility.OpenStreamAsync(bucketName, s3FilePath);
+                var entry = archive.CreateEntry(filePath, CompressionLevel.Optimal);
+
+                using (var entryStream = entry.Open())
+                {
+                    await fileStream.CopyToAsync(entryStream);
+                }
+            }
+            foreach (var subdirectory in response.CommonPrefixes)
+            {
+                string subdirectoryName = subdirectory.Replace(s3FolderPath, "");
+                var subdirectoryResponse = await GetRecursiveResponse("/", s3FolderPath + subdirectoryName, false);
+                await DownloadSubdirectories(archive, folderName, folderName + subdirectoryName, s3FolderPath + subdirectoryName, subdirectoryResponse);
+            }
+        }
+
+        public static async Task<ListObjectsResponse> GetRecursiveResponse(string delimiter, string prefix, bool childCheck)
+        {
+            try
+            {
+                ListObjectsRequest request = new ListObjectsRequest { BucketName = bucketName, Delimiter = delimiter, Prefix = prefix };
+                if (childCheck)
+                    return await client.ListObjectsAsync(request);
+                else
+                    return await client.ListObjectsAsync(request);
+            }
+            catch (AmazonS3Exception amazonS3Exception) { throw amazonS3Exception; }
         }
 
         // Deletes a Directory
