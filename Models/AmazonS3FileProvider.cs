@@ -647,7 +647,7 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
                     {
                         foreach (S3Object S3Object in response.S3Objects)
                         {
-                            if (S3Object.Key == this.RootName.Replace("/", "") + data[0].FilterPath + newName)
+                            if (S3Object.Key == this.RootName.Replace("/", "") + data[0].FilterPath + (showFileExtension ? newName : (newName + data[0].Type)))
                                 files.Add(CreateDirectoryContentInstance(S3Object.Key.Split("/").Last(), true, Path.GetExtension(S3Object.Key), S3Object.Size, S3Object.LastModified, S3Object.LastModified, false, data[0].FilterPath));
                         }
                     }
