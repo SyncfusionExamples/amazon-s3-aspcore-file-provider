@@ -604,10 +604,6 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
             FileManagerDirectoryContent cwd = new FileManagerDirectoryContent();
             AccessPermission PathPermission = GetPathPermission(data[0].FilterPath + data[0].Name, data[0].IsFile);
             List<FileManagerDirectoryContent> files = new List<FileManagerDirectoryContent>();
-            if (!showFileExtension && data[0].IsFile)
-            {
-                newName = newName + data[0].Type;
-            }
             if (checkFileExist(data[0].FilterPath, newName))
             {
                 ErrorDetails er = new ErrorDetails();
