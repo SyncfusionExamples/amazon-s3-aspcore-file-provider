@@ -426,14 +426,6 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
             }
         }
 
-        // Renames a directory
-        private string DirectoryRename(string newPath)
-        {
-            int directoryCount = 0;
-            while (System.IO.Directory.Exists(newPath + (directoryCount > 0 ? "(" + directoryCount.ToString() + ")" : ""))) { directoryCount++; }
-            return newPath + (directoryCount > 0 ? "(" + directoryCount.ToString() + ")" : "");
-        }
-
         //Gets the details of the file(s) or folder(s)
         public FileManagerResponse Details(string path, string[] names, params FileManagerDirectoryContent[] data)
         {
