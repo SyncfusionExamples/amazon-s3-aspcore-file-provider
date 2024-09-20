@@ -6,13 +6,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Syncfusion.EJ2.FileManager.Base;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
 using System.IO;
 using Microsoft.AspNetCore.Http;
 using Amazon.S3.Transfer;
 using Microsoft.AspNetCore.Mvc;
 using System.IO.Compression;
+using System.Text.Json;
 
 namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
 {
@@ -1036,7 +1035,12 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
         }
         public string ToCamelCase(FileManagerResponse userData)
         {
-            return JsonConvert.SerializeObject(userData, new JsonSerializerSettings { ContractResolver = new DefaultContractResolver { NamingStrategy = new CamelCaseNamingStrategy() } });
+            JsonSerializerOptions options = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            };
+
+            return JsonSerializer.Serialize(userData, options);
         }
         protected virtual string[] GetFolderDetails(string path)
         {

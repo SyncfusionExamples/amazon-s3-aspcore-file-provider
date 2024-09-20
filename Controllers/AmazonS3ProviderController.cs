@@ -4,11 +4,11 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
-using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using Syncfusion.EJ2.FileManager.Base;
 using Amazon;
+using System.Text.Json;
 
 namespace EJ2AmazonS3ASPCoreFileProvider.Controllers
 {
@@ -80,7 +80,11 @@ namespace EJ2AmazonS3ASPCoreFileProvider.Controllers
         {
             FileManagerResponse uploadResponse;
             FileManagerDirectoryContent[] dataObject = new FileManagerDirectoryContent[1];
-            dataObject[0] = JsonConvert.DeserializeObject<FileManagerDirectoryContent>(data);
+            var options = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            };
+            dataObject[0] = JsonSerializer.Deserialize<FileManagerDirectoryContent>(data, options);
             foreach (var file in uploadFiles)
             {
                 var folders = (file.FileName).Split('/');
@@ -112,7 +116,11 @@ namespace EJ2AmazonS3ASPCoreFileProvider.Controllers
         [Route("AmazonS3Download")]
         public IActionResult AmazonS3Download(string downloadInput)
         {
-            FileManagerDirectoryContent args = JsonConvert.DeserializeObject<FileManagerDirectoryContent>(downloadInput);
+            var options = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            };
+            FileManagerDirectoryContent args = JsonSerializer.Deserialize<FileManagerDirectoryContent>(downloadInput, options);
             return operation.Download(args.Path, args.Names);
         }
 
