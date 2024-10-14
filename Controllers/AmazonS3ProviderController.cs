@@ -101,6 +101,7 @@ namespace EJ2AmazonS3ASPCoreFileProvider.Controllers
                     }
                 }
             }
+            operation.HttpContext = HttpContext;
             uploadResponse = operation.Upload(path, uploadFiles, action, dataObject);
             if (uploadResponse.Error != null)
             {

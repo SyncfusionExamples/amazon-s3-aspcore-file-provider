@@ -28,6 +28,9 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
         long sizeValue = 0;
         List<FileManagerDirectoryContent> s3ObjectFiles = new List<FileManagerDirectoryContent>();
         TransferUtility fileTransferUtility = new TransferUtility(client);
+        public HttpContext HttpContext;
+        private static List<PartETag> partETags;
+        private static string uploadId;
 
         // Register the amazon client details
         public void RegisterAmazonS3(string name, string awsAccessKeyId, string awsSecretAccessKey, string region)
@@ -682,25 +685,25 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
                     fullName = fullName.Replace("../", "");
                     if (uploadFiles != null)
                     {
+                        bool isValidChunkUpload = file.ContentType == "application/octet-stream";
                         if (action == "save")
                         {
-                            if (!System.IO.File.Exists(fullName))
-                            {
-                                using (FileStream fsSource = new FileStream(Path.Combine(Path.GetTempPath(), fileName), FileMode.Create))
-                                {
-                                    file.CopyTo(fsSource);
-                                    fsSource.Close();
-                                }
-                                using (FileStream fileToUpload = new FileStream(Path.Combine(Path.GetTempPath(), fileName), FileMode.Open, FileAccess.Read))
-                                {
-                                    await fileTransferUtility.UploadAsync(fileToUpload, bucketName, RootName.Replace("/", "") + path + fileName);
-                                }
-                            }
-                            else
+                            bool isExist = checkFileExist(path, name);
+                            if (isExist)
                             {
                                 existFiles.Add(name);
                             }
-
+                            else
+                            {
+                                if (isValidChunkUpload)
+                                {
+                                    await PerformChunkedUpload(file, bucketName, RootName.Replace("/", "") + path + fileName);
+                                }
+                                else
+                                {
+                                    await PerformDefaultUpload(file, fileName, path);
+                                }
+                            }
                         }
                         else if (action == "replace")
                         {
@@ -708,16 +711,14 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
                             {
                                 System.IO.File.Delete(fullName);
                             }
-                            using (FileStream fsSource = new FileStream(Path.Combine(Path.GetTempPath(), fileName), FileMode.Create))
+                            if (isValidChunkUpload)
                             {
-                                file.CopyTo(fsSource);
-                                fsSource.Close();
+                                await PerformChunkedUpload(file, bucketName, RootName.Replace("/", "") + path + fileName);
                             }
-                            using (FileStream fileToUpload = new FileStream(Path.Combine(Path.GetTempPath(), fileName), FileMode.Open, FileAccess.Read))
+                            else
                             {
-                                await fileTransferUtility.UploadAsync(fileToUpload, bucketName, RootName.Replace("/", "") + path + file.FileName);
+                                await PerformDefaultUpload(file, fileName, path);
                             }
-
                         }
                         else if (action == "keepboth")
                         {
@@ -731,20 +732,19 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
                                 newFileName = newFileName.Substring(0, indexValue);
                             }
                             int fileCount = 0;
-                            while (System.IO.File.Exists(newName + (fileCount > 0 ? "(" + fileCount.ToString() + ")" + Path.GetExtension(name) : Path.GetExtension(name))))
+                            while (checkFileExist(path, newFileName + (fileCount > 0 ? "(" + fileCount.ToString() + ")" + Path.GetExtension(name) : Path.GetExtension(name))))
                             {
                                 fileCount++;
                             }
                             newName = newFileName + (fileCount > 0 ? "(" + fileCount.ToString() + ")" : "") + Path.GetExtension(name);
                             GetBucketList();
-                            using (FileStream fsSource = new FileStream(Path.Combine(Path.GetTempPath(), newName), FileMode.Create))
+                            if (isValidChunkUpload)
                             {
-                                file.CopyTo(fsSource);
-                                fsSource.Close();
+                                await PerformChunkedUpload(file, bucketName, RootName.Replace("/", "") + path + newName);
                             }
-                            using (FileStream fileToUpload = new FileStream(Path.Combine(Path.GetTempPath(), newName), FileMode.Open, FileAccess.Read))
+                            else
                             {
-                                await fileTransferUtility.UploadAsync(fileToUpload, bucketName, RootName.Replace("/", "") + path + newName);
+                                await PerformDefaultUpload(file, newName, path);
                             }
                         }
                         else if (action == "remove")
@@ -780,6 +780,71 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
                 if ((er.Code == "401") && !string.IsNullOrEmpty(accessMessage)) { er.Message = accessMessage; }
                 uploadResponse.Error = er;
                 return uploadResponse;
+            }
+        }
+
+        private async Task PerformDefaultUpload(IFormFile file, string fileName, string path)
+        {
+            using (FileStream fsSource = new FileStream(Path.Combine(Path.GetTempPath(), fileName), FileMode.Create))
+            {
+                file.CopyTo(fsSource);
+                fsSource.Close();
+            }
+            using (FileStream fileToUpload = new FileStream(Path.Combine(Path.GetTempPath(), fileName), FileMode.Open, FileAccess.Read))
+            {
+                await fileTransferUtility.UploadAsync(fileToUpload, bucketName, RootName.Replace("/", "") + path + fileName);
+            }
+        }
+
+        public async Task PerformChunkedUpload(IFormFile file, string bucketName, string keyName)
+        {
+            try
+            {
+                int chunkIndex = Convert.ToInt32(HttpContext.Request.Form["chunk-index"]);
+                int totalChunk = Convert.ToInt32(HttpContext.Request.Form["total-chunk"]);
+                if (chunkIndex == 0)
+                {
+                    uploadId = string.Empty;
+                    partETags = new List<PartETag>();
+                    var initiateRequest = new InitiateMultipartUploadRequest
+                    {
+                        BucketName = bucketName,
+                        Key = keyName
+                    };
+                    var initResponse = await client.InitiateMultipartUploadAsync(initiateRequest);
+                    uploadId = initResponse.UploadId;
+                }
+
+                using (var stream = file.OpenReadStream())
+                {
+                    var uploadPartRequest = new UploadPartRequest
+                    {
+                        BucketName = bucketName,
+                        Key = keyName,
+                        UploadId = uploadId,
+                        PartNumber = chunkIndex + 1,
+                        InputStream = stream,
+                        PartSize = stream.Length
+                    };
+
+                    var uploadPartResponse = await client.UploadPartAsync(uploadPartRequest);
+                    partETags.Add(new PartETag(uploadPartResponse.PartNumber, uploadPartResponse.ETag));
+                    if (chunkIndex == totalChunk - 1)
+                    {
+                        var completeRequest = new CompleteMultipartUploadRequest
+                        {
+                            BucketName = bucketName,
+                            Key = keyName,
+                            UploadId = uploadId,
+                            PartETags = partETags
+                        };
+                        await client.CompleteMultipartUploadAsync(completeRequest);
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                throw;
             }
         }
 
