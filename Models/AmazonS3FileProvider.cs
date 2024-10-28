@@ -28,7 +28,6 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
         long sizeValue = 0;
         List<FileManagerDirectoryContent> s3ObjectFiles = new List<FileManagerDirectoryContent>();
         TransferUtility fileTransferUtility = new TransferUtility(client);
-        public HttpContext HttpContext;
         private static List<PartETag> partETags;
         private static string uploadId;
 
@@ -656,13 +655,13 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
             }
         }
 
-        public FileManagerResponse Upload(string path, IList<IFormFile> uploadFiles, string action, FileManagerDirectoryContent[] data)
+        public FileManagerResponse Upload(string path, IList<IFormFile> uploadFiles, string action, int chunkIndex, int totalChunk, FileManagerDirectoryContent[] data)
         {
-            return AsyncUpload(path, uploadFiles, action, data).Result;
+            return AsyncUpload(path, uploadFiles, action, chunkIndex, totalChunk, data).Result;
         }
 
         // Uploads the file(s)
-        public virtual async Task<FileManagerResponse> AsyncUpload(string path, IList<IFormFile> uploadFiles, string action, FileManagerDirectoryContent[] data)
+        public virtual async Task<FileManagerResponse> AsyncUpload(string path, IList<IFormFile> uploadFiles, string action, int chunkIndex, int totalChunk, FileManagerDirectoryContent[] data)
         {
             FileManagerResponse uploadResponse = new FileManagerResponse();
             AccessPermission PathPermission = GetPathPermission(data[0].FilterPath + data[0].Name, false);
@@ -697,7 +696,7 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
                             {
                                 if (isValidChunkUpload)
                                 {
-                                    await PerformChunkedUpload(file, bucketName, RootName.Replace("/", "") + path + fileName);
+                                    await PerformChunkedUpload(file, bucketName, chunkIndex, totalChunk, RootName.Replace("/", "") + path + fileName);
                                 }
                                 else
                                 {
@@ -713,7 +712,7 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
                             }
                             if (isValidChunkUpload)
                             {
-                                await PerformChunkedUpload(file, bucketName, RootName.Replace("/", "") + path + fileName);
+                                await PerformChunkedUpload(file, bucketName, chunkIndex, totalChunk, RootName.Replace("/", "") + path + fileName);
                             }
                             else
                             {
@@ -740,7 +739,7 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
                             GetBucketList();
                             if (isValidChunkUpload)
                             {
-                                await PerformChunkedUpload(file, bucketName, RootName.Replace("/", "") + path + newName);
+                                await PerformChunkedUpload(file, bucketName, chunkIndex, totalChunk, RootName.Replace("/", "") + path + newName);
                             }
                             else
                             {
@@ -785,23 +784,16 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
 
         private async Task PerformDefaultUpload(IFormFile file, string fileName, string path)
         {
-            using (FileStream fsSource = new FileStream(Path.Combine(Path.GetTempPath(), fileName), FileMode.Create))
+            using (var stream = file.OpenReadStream())
             {
-                file.CopyTo(fsSource);
-                fsSource.Close();
-            }
-            using (FileStream fileToUpload = new FileStream(Path.Combine(Path.GetTempPath(), fileName), FileMode.Open, FileAccess.Read))
-            {
-                await fileTransferUtility.UploadAsync(fileToUpload, bucketName, RootName.Replace("/", "") + path + fileName);
+                await fileTransferUtility.UploadAsync(stream, bucketName, RootName.Replace("/", "") + path + fileName);
             }
         }
 
-        public async Task PerformChunkedUpload(IFormFile file, string bucketName, string keyName)
+        public async Task PerformChunkedUpload(IFormFile file, string bucketName, int chunkIndex, int totalChunk, string keyName)
         {
             try
             {
-                int chunkIndex = Convert.ToInt32(HttpContext.Request.Form["chunk-index"]);
-                int totalChunk = Convert.ToInt32(HttpContext.Request.Form["total-chunk"]);
                 if (chunkIndex == 0)
                 {
                     uploadId = string.Empty;
