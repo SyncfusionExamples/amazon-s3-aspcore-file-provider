@@ -15,7 +15,7 @@ using System.Text.Json;
 
 namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
 {
-    public class AmazonS3FileProvider : IAmazonS3FileProviderBase
+    public class AmazonS3FileProvider
     {
         protected static string bucketName;
         static IAmazonS3 client;
