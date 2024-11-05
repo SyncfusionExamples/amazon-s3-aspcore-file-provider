@@ -655,13 +655,13 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
             }
         }
 
-        public FileManagerResponse Upload(string path, IList<IFormFile> uploadFiles, string action, int chunkIndex, int totalChunk, FileManagerDirectoryContent[] data)
+        public FileManagerResponse Upload(string path, IList<IFormFile> uploadFiles, string action, FileManagerDirectoryContent[] data, int chunkIndex = 0, int totalChunk = 0)
         {
-            return AsyncUpload(path, uploadFiles, action, chunkIndex, totalChunk, data).Result;
+            return AsyncUpload(path, uploadFiles, action, data, chunkIndex, totalChunk).Result;
         }
 
         // Uploads the file(s)
-        public virtual async Task<FileManagerResponse> AsyncUpload(string path, IList<IFormFile> uploadFiles, string action, int chunkIndex, int totalChunk, FileManagerDirectoryContent[] data)
+        public virtual async Task<FileManagerResponse> AsyncUpload(string path, IList<IFormFile> uploadFiles, string action, FileManagerDirectoryContent[] data, int chunkIndex, int totalChunk)
         {
             FileManagerResponse uploadResponse = new FileManagerResponse();
             AccessPermission PathPermission = GetPathPermission(data[0].FilterPath + data[0].Name, false);
