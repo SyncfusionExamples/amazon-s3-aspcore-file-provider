@@ -101,8 +101,8 @@ namespace EJ2AmazonS3ASPCoreFileProvider.Controllers
                     }
                 }
             }
-            int chunkIndex = Convert.ToInt32(HttpContext.Request.Form["chunk-index"]);
-            int totalChunk = Convert.ToInt32(HttpContext.Request.Form["total-chunk"]);
+            int chunkIndex = int.TryParse(HttpContext.Request.Form["chunk-index"], out int parsedChunkIndex) ? parsedChunkIndex : 0;
+            int totalChunk = int.TryParse(HttpContext.Request.Form["total-chunk"], out int parsedTotalChunk) ? parsedTotalChunk : 0;
             uploadResponse = operation.Upload(path, uploadFiles, action, dataObject, chunkIndex, totalChunk);
             if (uploadResponse.Error != null)
             {
