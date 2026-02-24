@@ -730,7 +730,7 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
                     fullName = fullName.Replace("../", "");
                     if (uploadFiles != null)
                     {
-                        bool isValidChunkUpload = file.ContentType == "application/octet-stream" && totalChunk > 1 && chunkIndex >= 0 && chunkIndex < totalChunk;
+                        bool isValidChunkUpload = file.ContentType == "application/octet-stream" && totalChunk > 0;
                         if (action == "save")
                         {
                             bool isExist = checkFileExist(path, name);
