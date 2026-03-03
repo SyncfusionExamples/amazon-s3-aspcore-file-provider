@@ -1056,7 +1056,10 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
                         string newKey = s3Object.Key.Replace(!isFile ? sourceKey : sourceKey.Substring(0, sourceKey.Length - 1), !isFile ? destinationKey : destinationKey.Substring(0, destinationKey.Length - 1));
                         CopyObjectRequest copyObjectRequest = new CopyObjectRequest() { SourceBucket = bucketName, DestinationBucket = bucketName, SourceKey = s3Object.Key, DestinationKey = newKey };
                         CopyObjectResponse copyObectResponse = await client.CopyObjectAsync(copyObjectRequest);
-                        if (deleteS3Objects) deleteObjectsRequest.AddKey(s3Object.Key);
+                        if (deleteObjectsRequest?.Objects != null && deleteObjectsRequest.Objects.Count > 0)
+                        {
+                            await client.DeleteObjectsAsync(deleteObjectsRequest);
+                        }
                     }
                     if (listObjectsResponse.IsTruncated) listObjectsRequest.Marker = listObjectsResponse.NextMarker; else listObjectsRequest = null;
                 } while (listObjectsRequest != null);
