@@ -1,6 +1,6 @@
 # amazon-s3-aspcore-file-provider
 
-This repository contains the Amazon S3 bucket file system provider in ASP.NET Core for the Syncfusion File Manager component.
+This repository contains the Amazon S3 bucket file system provider in ASP.NET Core for the File Manager component.
 
 ## Key Features
 
