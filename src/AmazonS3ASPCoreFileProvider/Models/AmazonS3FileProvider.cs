@@ -1056,18 +1056,20 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
                         string newKey = s3Object.Key.Replace(!isFile ? sourceKey : sourceKey.Substring(0, sourceKey.Length - 1), !isFile ? destinationKey : destinationKey.Substring(0, destinationKey.Length - 1));
                         CopyObjectRequest copyObjectRequest = new CopyObjectRequest() { SourceBucket = bucketName, DestinationBucket = bucketName, SourceKey = s3Object.Key, DestinationKey = newKey };
                         CopyObjectResponse copyObectResponse = await client.CopyObjectAsync(copyObjectRequest);
-                        if (deleteObjectsRequest?.Objects != null && deleteObjectsRequest.Objects.Count > 0)
+                        if (deleteS3Objects)
                         {
-                            await client.DeleteObjectsAsync(deleteObjectsRequest);
+                            deleteObjectsRequest.Objects.Add(new KeyVersion() { Key = s3Object.Key });
                         }
                     }
                     if (listObjectsResponse.IsTruncated) listObjectsRequest.Marker = listObjectsResponse.NextMarker; else listObjectsRequest = null;
                 } while (listObjectsRequest != null);
-                await client.DeleteObjectsAsync(deleteObjectsRequest);
+                if (deleteS3Objects && deleteObjectsRequest?.Objects != null && deleteObjectsRequest.Objects.Count > 0)
+                {
+                    await client.DeleteObjectsAsync(deleteObjectsRequest);
+                }
             }
             catch (AmazonS3Exception) { throw; }
         }
-
         // Gets the child  file(s) or directories details within a directory & Calculates the folder size value
         private void GetChildObjects(List<string> commonPrefixes, bool isDetailsRequest, string searchString)
         {

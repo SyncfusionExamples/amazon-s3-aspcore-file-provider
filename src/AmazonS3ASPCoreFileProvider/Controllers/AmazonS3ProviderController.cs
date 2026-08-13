@@ -24,8 +24,22 @@ namespace EJ2AmazonS3ASPCoreFileProvider.Controllers
         {
             this.basePath = hostingEnvironment.ContentRootPath;
             this.basePath = basePath.Replace("../", "");
+
+            string bucketName = Environment.GetEnvironmentVariable("AWS_BUCKET_NAME");
+            string awsAccessKeyId = Environment.GetEnvironmentVariable("AWS_ACCESS_KEY_ID");
+            string awsSecretAccessKey = Environment.GetEnvironmentVariable("AWS_SECRET_ACCESS_KEY");
+            string region = Environment.GetEnvironmentVariable("AWS_BUCKET_REGION");
+
+            if (string.IsNullOrWhiteSpace(bucketName))
+            {
+                bucketName = "<---bucketName--->";
+                awsAccessKeyId = "<---awsAccessKeyId--->";
+                awsSecretAccessKey = "<---awsSecretAccessKey--->";
+                region = "<---region--->";
+            }
+
             this.operation = new AmazonS3FileProvider();
-            this.operation.RegisterAmazonS3("<---bucketName--->", "<---awsAccessKeyId--->", "<---awsSecretAccessKey--->", "<---region--->");
+            this.operation.RegisterAmazonS3(bucketName, awsAccessKeyId, awsSecretAccessKey, region);
         }
         [HttpPost("AmazonS3FileOperations")]
         public object AmazonS3FileOperations([FromBody] FileManagerDirectoryContent args)
