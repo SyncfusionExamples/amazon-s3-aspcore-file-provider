@@ -25,18 +25,22 @@ namespace EJ2AmazonS3ASPCoreFileProvider.Controllers
             this.basePath = hostingEnvironment.ContentRootPath;
             this.basePath = basePath.Replace("../", "");
 
+            // Read the Amazon S3 configuration from environment variables.
+            // These values are provided through Docker (docker-compose.yml / Dockerfile) or the host environment.
             string bucketName = Environment.GetEnvironmentVariable("AWS_BUCKET_NAME");
             string awsAccessKeyId = Environment.GetEnvironmentVariable("AWS_ACCESS_KEY_ID");
             string awsSecretAccessKey = Environment.GetEnvironmentVariable("AWS_SECRET_ACCESS_KEY");
             string region = Environment.GetEnvironmentVariable("AWS_BUCKET_REGION");
 
+            // Use placeholder values for manual configuration
             if (string.IsNullOrWhiteSpace(bucketName))
-            {
                 bucketName = "<---bucketName--->";
+            if (string.IsNullOrWhiteSpace(awsAccessKeyId))
                 awsAccessKeyId = "<---awsAccessKeyId--->";
+            if (string.IsNullOrWhiteSpace(awsSecretAccessKey))
                 awsSecretAccessKey = "<---awsSecretAccessKey--->";
+            if (string.IsNullOrWhiteSpace(region))
                 region = "<---region--->";
-            }
 
             this.operation = new AmazonS3FileProvider();
             this.operation.RegisterAmazonS3(bucketName, awsAccessKeyId, awsSecretAccessKey, region);
