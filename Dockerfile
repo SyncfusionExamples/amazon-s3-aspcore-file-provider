@@ -3,7 +3,6 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
 RUN apt-get update -y && apt-get install fontconfig -y
 WORKDIR /app
 
-ENV SYNCFUSION_LICENSE_KEY=""
 ENV AWS_ACCESS_KEY_ID=""
 ENV AWS_SECRET_ACCESS_KEY=""
 ENV AWS_BUCKET_NAME=""
