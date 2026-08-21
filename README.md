@@ -119,6 +119,90 @@ The FileManager will be rendered as the following.
 
 ![File Manager](https://ej2.syncfusion.com/products/images/file-manager/readme.gif)
 
+## Docker Support
+
+The File Manager Amazon S3 file provider is also available as a pre-built Docker image for quick deployment to your infrastructure. The image exposes the same Web API endpoints as the ASP.NET Core project in this repository; configure it through the environment variables listed below.
+
+You can deploy it quickly to your infrastructure. If you want to add new functionality or customize any existing functionalities, create your own Docker file by referencing the existing [File Manager Amazon S3 Docker project](https://github.com/SyncfusionExamples/amazon-s3-aspcore-file-provider).
+
+The File Manager is supported on multiple platforms including JavaScript, Angular, React, Vue, ASP.NET Core, ASP.NET MVC, TypeScript, and Blazor.
+
+### Prerequisites
+
+Have [Docker](https://www.docker.com/products/container-runtime#/download) installed in your environment:
+
+* On Windows, install [Docker for Windows](https://docs.docker.com/docker-for-windows/install/).
+* On macOS, install [Docker for Mac](https://docs.docker.com/docker-for-mac/install/).
+
+### How to deploy the File Manager Amazon S3 Service Docker Image
+
+**Step 1:** Pull the Amazon S3 file provider image from Docker Hub.
+
+```
+docker pull syncfusion/filemanager-amazon-s3-aspnetcore-provider
+```
+
+**Step 2:** Create the `docker-compose.yml` file with the following content.
+
+**docker-compose.yml**
+
+```yaml
+version: '3.8'
+
+services:
+  amazon-s3-aspnetcore-provider:
+    image: syncfusion/filemanager-amazon-s3-aspnetcore-provider:latest
+    environment:
+      # Provide your Amazon S3 credentials
+      AWS_ACCESS_KEY_ID: YOUR_AWS_ACCESS_KEY_ID
+      AWS_SECRET_ACCESS_KEY: YOUR_AWS_SECRET_ACCESS_KEY
+      AWS_BUCKET_NAME: YOUR_AWS_BUCKET_NAME
+      AWS_BUCKET_REGION: YOUR_AWS_BUCKET_REGION
+    ports:
+      - "5000:80"
+```
+
+**Step 3:** Run the container.
+
+In a terminal tab, navigate to the directory where you placed the `docker-compose.yml` file and execute the following:
+
+```
+docker compose up
+```
+
+The File Manager Amazon S3 provider will be accessible at `http://localhost:5000`.
+
+To stop the container, run:
+
+```
+docker compose down
+```
+
+#### Amazon S3 credential details
+
+| Environment Variable | Required | Description |
+|----------------------|----------|-------------|
+| `AWS_ACCESS_KEY_ID` | Yes | Access key ID of your AWS IAM user. |
+| `AWS_SECRET_ACCESS_KEY` | Yes | Secret access key of your AWS IAM user. |
+| `AWS_BUCKET_NAME` | Yes | Name of the S3 bucket that stores the files. |
+| `AWS_BUCKET_REGION` | Yes | AWS region code where the bucket is hosted. Example: `us-east-1` |
+
+**Step 4:** Configure the client-side File Manager component.
+
+To access the file operations through the Amazon S3 service running in Docker, just map the following code snippet in the `ajaxSettings` property of the File Manager component. Here, the `hostUrl` will be the URL of the running Docker instance.
+
+```
+  var hostUrl = http://localhost:5000/;
+  ajaxSettings: {
+        url: hostUrl + 'api/AmazonS3Provider/AmazonS3FileOperations',
+        uploadUrl: hostUrl + 'api/AmazonS3Provider/AmazonS3Upload',
+        downloadUrl: hostUrl + 'api/AmazonS3Provider/AmazonS3Download',
+        getImageUrl: hostUrl + 'api/AmazonS3Provider/AmazonS3GetImage'
+  }
+```
+
+For more information about File Manager setup on other platforms, see the getting started pages for [JavaScript](https://help.syncfusion.com/file-manager-sdk/javascript/es5-getting-started), [Angular](https://help.syncfusion.com/file-manager-sdk/angular/getting-started), [React](https://help.syncfusion.com/file-manager-sdk/react/getting-started), [Vue](https://help.syncfusion.com/file-manager-sdk/vue/getting-started), [TypeScript](https://help.syncfusion.com/file-manager-sdk/typescript/getting-started), [ASP.NET Core](https://help.syncfusion.com/file-manager-sdk/asp-net-core/getting-started), [ASP.NET MVC](https://help.syncfusion.com/file-manager-sdk/asp-net-mvc/getting-started), and [Blazor](https://help.syncfusion.com/file-manager-sdk/blazor/getting-started-with-web-app).
+
 ## Support
 
 Product support is available through the following mediums:
