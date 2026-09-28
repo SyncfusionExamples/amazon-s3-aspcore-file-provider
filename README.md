@@ -24,8 +24,10 @@ The following actions can be performed with Amazon S3 bucket file system provide
 To run the service, create an Amazon S3 bucket in one of the AWS Regions for accessing and storing the S3 objects as files or folders. Create an [Amazon S3 account](https://docs.aws.amazon.com/AmazonS3/latest/gsg/CreatingABucket.html) and then create S3 bucket to perform the file operations. Then, open the `AmazonS3FileProvider` and register your Amazon S3 client account details like awsAccessKeyId, awsSecretAccessKey, bucketRegion, and bucketName details in `RegisterAmazonS3` method to perform the file operations. 
 
 ```
-  void RegisterAmazonS3(string bucketName, string awsAccessKeyId, string awsSecretAccessKey, string bucketRegion);
+  void RegisterAmazonS3(string bucketName, string awsAccessKeyId, string awsSecretAccessKey, string bucketRegion, string rootFolder);
 ```
+
+Set `rootFolder` to a bucket-relative path such as `department/reports` to use a nested folder as the File Manager root. Leave it empty to retain the existing automatic root selection. The configured folder must already contain an object or subfolder; paths are validated during provider registration. In the sample controller, replace the fifth argument on the `RegisterAmazonS3` call directly, alongside the bucket and credential values.
 
 ## How to run this application
 
