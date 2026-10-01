@@ -21,7 +21,6 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
         private static string bucketName;
         static IAmazonS3 client;
         private string RootName;
-        private string configuredRootName;
         private string rootName = string.Empty;
         private string accessMessage = string.Empty;
         AccessDetails AccessDetails = new AccessDetails();
@@ -44,42 +43,18 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
         }
 
         // Register the amazon client details
-        public void RegisterAmazonS3(string name, string awsAccessKeyId, string awsSecretAccessKey, string region)
-        {
-            RegisterAmazonS3(name, awsAccessKeyId, awsSecretAccessKey, region, null);
-        }
-
         public void RegisterAmazonS3(string name, string awsAccessKeyId, string awsSecretAccessKey, string region, string rootFolder)
         {
             bucketName = name;
-            configuredRootName = NormalizeRootFolder(rootFolder);
+            RootName = NormalizeRootFolder(rootFolder);
             RegionEndpoint bucketRegion = RegionEndpoint.GetBySystemName(region);
             client = new AmazonS3Client(awsAccessKeyId, awsSecretAccessKey, bucketRegion);
-            if (!string.IsNullOrEmpty(configuredRootName))
-            {
-                RootName = configuredRootName;
+            if (!string.IsNullOrEmpty(RootName)) {
                 ValidateConfiguredRoot();
-            }
-            else
-            {
-                GetBucketList();
             }
         }
 
         //Define the root directory to the file manager
-        private void GetBucketList()
-        {
-            if (!string.IsNullOrEmpty(configuredRootName))
-            {
-                RootName = configuredRootName;
-                return;
-            }
-
-            ListingObjectsAsync("", "", false).Wait();
-            RootName = response.S3Objects.Where(x => x.Key.Split(".").Length != 2).First().Key;
-            RootName = RootName.Replace("../", "");
-        }
-
         private void ValidateConfiguredRoot()
         {
             ListingObjectsAsync("/", RootName, false).Wait();
@@ -104,8 +79,6 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
             string prev;
             do { prev = normalizedPath; normalizedPath = Uri.UnescapeDataString(prev); } while (prev != normalizedPath);
             do { prev = normalizedName; normalizedName = Uri.UnescapeDataString(prev); } while (prev != normalizedName);
-            normalizedPath = normalizedPath.Replace('\\', '/');
-            normalizedName = normalizedName.Replace('\\', '/');
             if (!normalizedPath.StartsWith("/")) normalizedPath = "/" + normalizedPath;
             while (normalizedPath.Contains("//")) normalizedPath = normalizedPath.Replace("//", "/");
             while (normalizedName.Contains("//")) normalizedName = normalizedName.Replace("//", "/");
@@ -145,7 +118,6 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
             List<FileManagerDirectoryContent> files = new List<FileManagerDirectoryContent>();
             List<FileManagerDirectoryContent> filesS3 = new List<FileManagerDirectoryContent>();
             FileManagerResponse readResponse = new FileManagerResponse();
-            GetBucketList();
             try
             {
                 if (path == "/") ListingObjectsAsync("/", RootName , false).Wait(); else ListingObjectsAsync("/", SanitizePath(path, null, true), false).Wait();
@@ -245,7 +217,6 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
             try
             {
                 List<FileManagerDirectoryContent> files = new List<FileManagerDirectoryContent>();
-                GetBucketList();
                 if (path == "/") ListingObjectsAsync("/", RootName , false).Wait(); else ListingObjectsAsync("/", SanitizePath(path, null, true), false).Wait();
                 foreach (string name in names)
                 {
@@ -310,7 +281,6 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
             List<string> existFiles = new List<string>();
             try
             {
-                GetBucketList();
                 AccessPermission PathPermission = GetPathPermission(data[0].FilterPath + data[0].Name, false);
                 if(isCutRequest) { 
                     if (PathPermission != null && (!PathPermission.Read || !PathPermission.Write))
@@ -337,7 +307,6 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
                 }
                 else if (response.CommonPrefixes.Count > 0)
                     cwd = CreateDirectoryContentInstance(names[0].Contains("/") ? names[0].Split("/")[names[0].Split("/").Length - 2] : (path == "/" ? "Files" : path.Split("/")[path.Split("/").Length - 2]), false, "Folder", 0, DateTime.Now, DateTime.Now, (response.CommonPrefixes.Count > 0) ? true : false, TargetData.FilterPath);
-                GetBucketList();
                 if (names[0].Contains("/"))
                 {
                     foreach (string name in names)
@@ -539,7 +508,6 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
             FileManagerResponse getDetailResponse = new FileManagerResponse();
             try
             {
-                GetBucketList();
                 int i = names.Length;
                 string location = "";
                 if (names.Length > 0 && names[0].Contains("/"))
@@ -602,7 +570,6 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
 
         public bool checkFileExist(string path, string name)
         {
-            GetBucketList();
             ListingObjectsAsync("/", SanitizePath(path, null, true), false).Wait();
             bool checkExist = false;
             if (response.CommonPrefixes.Count > 0)
@@ -644,7 +611,6 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
                         accessMessage = PathPermission.Message;
                         throw new UnauthorizedAccessException("'" + name + "' is not accessible. You need permission to perform the writeContents action.");
                     }
-                    GetBucketList();
                     FileManagerDirectoryContent CreateData = new FileManagerDirectoryContent();
                     string key = SanitizePath(path, name, true);
                     PutObjectRequest request = new PutObjectRequest() { Key = key, BucketName = bucketName };
@@ -673,7 +639,6 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
             FileManagerResponse searchResponse = new FileManagerResponse();
             try
             {
-                GetBucketList();
                 if (path == "/") ListingObjectsAsync("/", RootName, false).Wait(); else ListingObjectsAsync("/", SanitizePath(path, null, true), false).Wait();
                 List<FileManagerDirectoryContent> files = new List<FileManagerDirectoryContent>();
                 List<FileManagerDirectoryContent> filesS3 = new List<FileManagerDirectoryContent>();
@@ -702,7 +667,6 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
         }
         public virtual async Task<FileManagerResponse> AsyncRename(string path, string name, string newName, bool replace, bool showFileExtension, params FileManagerDirectoryContent[] data)
         {
-            GetBucketList();
             FileManagerResponse renameResponse = new FileManagerResponse();
             FileManagerDirectoryContent cwd = new FileManagerDirectoryContent();
             AccessPermission PathPermission = GetPathPermission(data[0].FilterPath + data[0].Name, data[0].IsFile);
@@ -725,14 +689,12 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
                         accessMessage = PathPermission.Message;
                         throw new UnauthorizedAccessException();
                     }
-                    GetBucketList();
                     FileManagerResponse readResponse = new FileManagerResponse();
                     if (path == "/") ListingObjectsAsync("/", RootName , false).Wait(); else ListingObjectsAsync("/", SanitizePath(path, null, true), false).Wait();
                     if (path == "/")
                         cwd = response.S3Objects.Where(x => x.Key == RootName).Select(y => CreateDirectoryContentInstance(y.Key.ToString().Replace("/", ""), true, "folder", y.Size, y.LastModified, y.LastModified, false, data[0].FilterPath)).ToArray()[0];
                     else if (response.CommonPrefixes.Count > 0)
                         cwd = CreateDirectoryContentInstance(path.Split("/")[path.Split("/").Length - 2], false, "Folder", 0, DateTime.Now, DateTime.Now, (response.CommonPrefixes.Count > 0) ? true : false, "");
-                    GetBucketList();
                     if (data[0].FilterPath == "/") ListingObjectsAsync("/", RootName, false).Wait(); else ListingObjectsAsync("/", SanitizePath(data[0].FilterPath, null, true), false).Wait();
                     if (response.CommonPrefixes.Count > 1)
                     {
@@ -784,7 +746,6 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
                 }
                 string fileName = Path.GetFileName(uploadFiles[0].FileName);
                 fileName = fileName.Replace("../", "");
-                GetBucketList();
                 List<string> existFiles = new List<string>();
                 foreach (IFormFile file in uploadFiles)
                 {
@@ -846,7 +807,6 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
                                 fileCount++;
                             }
                             newName = newFileName + (fileCount > 0 ? "(" + fileCount.ToString() + ")" : "") + Path.GetExtension(name);
-                            GetBucketList();
                             if (isValidChunkUpload)
                             {
                                 await PerformChunkedUpload(file, bucketName, chunkIndex, totalChunk, SanitizePath(path, newName, false));
@@ -960,7 +920,6 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
                 {
                     return null;
                 }
-                GetBucketList();
                 ListingObjectsAsync("/", SanitizePath(path, null, false), false).Wait();
                 string fileName = path.ToString().Split("/").Last();
                 fileName = fileName.Replace("../", "");
@@ -978,7 +937,6 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
 
         public virtual async Task<FileStreamResult> DownloadAsync(string path, string[] names, params FileManagerDirectoryContent[] data)
         {
-            GetBucketList();
             FileStreamResult fileStreamResult = null;
             bool singleItemIsFile = false;
 
@@ -1013,7 +971,6 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
                         throw new UnauthorizedAccessException("'" + names[0] + "' is not accessible. Access is denied.");
                     }
 
-                    GetBucketList();
                     await ListingObjectsAsync("/", SanitizePath(path, null, true), false);
 
                     Stream stream = await fileTransferUtility.OpenStreamAsync(bucketName, SanitizePath(path, names[0], false));
@@ -1128,7 +1085,6 @@ namespace Syncfusion.EJ2.FileManager.AmazonS3FileProvider
         {
             try
             {
-                GetBucketList();
                 DeleteObjectsRequest deleteObjectsRequest = new DeleteObjectsRequest() { BucketName = bucketName };
                 foreach (string name in names)
                 {
